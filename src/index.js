@@ -1,111 +1,97 @@
-"use strict"
-import './css/styles.css';
-import { fetchCountries } from './fetchCountries';
-import debounce from 'lodash.debounce';
-import Notiflix from 'notiflix';
+import { fetchBreeds, fetchCatByBreed, fetchByUniqueId } from './cat-api';
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
 
-const searchBox = document.getElementById('search-box');
-const countryList = document.querySelector('.country-list');
-const countryInfo = document.querySelector('.country-info');
+const select = document.querySelector('.breed-select');
+const catInfo = document.querySelector('.cat-info');
+const loader = document.querySelector('.loader');
+const errorText = document.querySelector('.error');
 
-const DEBOUNCE_DELAY = 300;
+select.classList.add('select-invisible');
+catInfo.classList.add('select-invisible');
 
-const handleSearch = debounce(async () => {
-  const searchTerm = searchBox.value.trim();
+fetchBreeds()
+  .then(cats => renderNewOption(cats))
+  .catch(error => {
+    Notify.failure(error);
+    errorAlert();
+  });
 
-  countryList.innerHTML = '';
-  countryInfo.innerHTML = '';
+select.addEventListener('change', e => {
+  fetchCatByBreed(e.target.value).then(cat => {
+    generateImage(cat).catch(error => {
+      Notify.failure(error);
+      errorAlert();
+    });
+  });
+});
 
-  if (searchTerm === '') {
-    countryList.style.display = 'block'; 
-    return;
-  }
+function renderNewOption(cats) {
+  console.log(cats);
+  const template = cats
+    .map(cat => {
+      return `<option value="${cat.id}">${cat.name}</option>`;
+    })
+    .join('');
 
-  try {
-    const countries = await fetchCountries(searchTerm);
+  loader.textContent = '';
+  select.classList.replace('select-invisible', 'select-visible');
+  select.innerHTML = template;
+}
 
-    const exactMatch = countries.find(
-      (country) => country.name.official.toLowerCase() === searchTerm.toLowerCase()
-    );
+function generateImage(cat) {
+  console.log(cat);
 
-    if (exactMatch) {
-      renderCountryList(exactMatch);
-      displayCountryInfo(exactMatch);
-      countryList.style.display = 'none'; 
-    } else {
-      const matchingCountries = countries.filter((country) =>
-        country.name.official.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  const catImage = cat
+    .map(data => {
+      console.log(data);
+      return `<img class="cat-image" src="${data.url}" width="500px">`;
+    })
+    .join('');
 
-      if (matchingCountries.length === 0) {
-        Notiflix.Notify.failure('Oops, there is no country with that name.');
-      } else if (matchingCountries.length === 1) {
-        renderCountryList(matchingCountries[0]);
-        displayCountryInfo(matchingCountries[0]);
-        countryList.style.display = 'none'; 
-      } else {
-        renderCountryList(matchingCountries);
-        countryList.style.display = 'block'; 
+  catInfo.classList.replace('select-invisible', 'select-visible');
+  catInfo.innerHTML = catImage;
+
+  const newBreedId = cat.map(data => {
+    console.log(data.id);
+    return data.id;
+  });
+
+  return fetch(`https://api.thecatapi.com/v1/images/${newBreedId}`)
+    .then(response => {
+      if (!response.ok) {
+        Notify.failure(response.status);
+        errorAlert();
       }
-    }
-  } catch (error) {
-    const errorMessage =
-      error.message === 'Country not found'
-        ? 'An error occurred. Please try again later.'
-        : 'Oops, there is no country with that name.';
-    Notiflix.Notify.failure(errorMessage);
-  }
-}, DEBOUNCE_DELAY);
+      return response.json();
+    })
+    .then(data => {
+      console.log(data);
 
-searchBox.addEventListener('input', handleSearch);
+      const name = data.breeds[0].name;
+      const description = data.breeds[0].description;
+      const temperament = data.breeds[0].temperament;
 
-function renderCountry(country) {
-  const listItem = document.createElement('li');
-  const flagImg = document.createElement('img');
-  const countryName = document.createElement('span');
+      console.log('-----------------------');
+      console.log('INFO:');
+      console.log(`name: ${name}`);
+      console.log(`description: "${description}`);
+      console.log(`temperament: "${temperament}`);
+      console.log('-----------------------');
 
-  flagImg.src = country.flags.svg;
-  flagImg.alt = `${country.name.official} flag`;
-  flagImg.classList.add('flag');
+      const nameHTML = `<span class="name"><b>${name}</b></span>`;
+      const temperamentHTML = `<span class="temperament"><b>Temperament:</b> ${temperament}</span>`;
+      const descriptionHTML = `<span class="description">${description}</span>`;
 
-  countryName.textContent = country.name.official;
-
-  listItem.appendChild(flagImg);
-  listItem.appendChild(countryName);
-
-  listItem.addEventListener('click', () => {
-    displayCountryInfo(country);
-  });
-
-  countryList.appendChild(listItem);
+      catInfo.insertAdjacentHTML('beforeend', nameHTML);
+      catInfo.insertAdjacentHTML('beforeend', temperamentHTML);
+      catInfo.insertAdjacentHTML('beforeend', descriptionHTML);
+      return data;
+    });
 }
 
-function renderCountryList(countries) {
-  countryList.innerHTML = '';
-
-  if (!Array.isArray(countries)) {
-    countries = [countries];
-  }
-
-  if (countries.length > 10) {
-    Notiflix.Notify.info('Too many matches found. Please enter a more specific name.');
-    return;
-  }
-
-  countries.forEach((country) => {
-    renderCountry(country);
-  });
-}
-
-function displayCountryInfo(country) {
-  const languages = Object.values(country.languages).join(', ');
-  countryInfo.innerHTML = `
-    <h2>
-      <img src="${country.flags.svg}" alt="${country.name.official} flag" class="flag">
-      ${country.name.official}
-    </h2>
-    <p><strong>Capital:</strong> <em>${country.capital}</em></p>
-    <p><strong>Population:</strong> <em>${country.population}</em></p>
-    <p><strong>Languages:</strong> <em>${languages}</em></p>
-  `;
+function errorAlert() {
+  catInfo.classList.add('select-invisible');
+  loader.textContent = '';
+  errorText.classList.replace('select-invisible', 'select-visible');
+  select.classList.add('select-invisible');
 }
