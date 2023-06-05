@@ -1,4 +1,4 @@
-import { fetchBreeds, fetchCatByBreed, fetchByUniqueId } from './cat-api';
+import { fetchBreeds, fetchCatByBreed, fetchByUniqueId } from './cat';
 import { Notify } from 'notiflix/build/notiflix-notify-aio';
 
 const select = document.querySelector('.breed-select');
