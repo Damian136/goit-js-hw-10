@@ -8,7 +8,6 @@ const errorText = document.querySelector('.error');
 
 select.classList.add('select-invisible');
 catInfo.classList.add('select-invisible');
-
 fetchBreeds()
   .then(cats => renderNewOption(cats))
   .catch(error => {
